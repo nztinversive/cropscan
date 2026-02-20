@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --cs-background: #0a0a0a;
+  --cs-surface: #111111;
+  --cs-border: #27272a;
+  --cs-text: #f4f4f5;
+  --cs-muted: #a1a1aa;
+  --cs-green: #22c55e;
+  --cs-yellow: #eab308;
+  --cs-red: #ef4444;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--cs-text);
+  background: var(--cs-background);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  ::selection {
+    color: #f4f4f5;
+    background: rgba(34, 197, 94, 0.3);
+  }
+}

@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: cropscan
+    runtime: node
+    repo: https://github.com/nztinversive/cropscan
+    branch: main
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_MAPBOX_TOKEN
+        sync: false
