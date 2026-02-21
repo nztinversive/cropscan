@@ -5,32 +5,59 @@ import os from 'os';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { NextRequest, NextResponse } from 'next/server';
+import { addAnalysisResult } from '@/lib/store';
+import { Detection } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-type Detection = {
-  class: string;
-  confidence: number;
-  bbox: [number, number, number, number];
+const IMAGE_SIZE = 512;
+const MOCK_CLASS_WEIGHTS: Record<string, number> = {
+  cloud_shadow: 6,
+  double_plant: 8,
+  planter_skip: 10,
+  standing_water: 14,
+  waterway: 2,
+  weed_cluster: 9,
+  nutrient_deficiency: 12,
+  storm_damage: 16,
 };
 
-const IMAGE_SIZE = 512;
+const MOCK_CLASS_RANGES: Record<
+  keyof typeof MOCK_CLASS_WEIGHTS,
+  { minCount: number; maxCount: number; minConfidence: number; maxConfidence: number; maxSize: number }
+> = {
+  cloud_shadow: { minCount: 1, maxCount: 2, minConfidence: 0.48, maxConfidence: 0.83, maxSize: 240 },
+  double_plant: { minCount: 0, maxCount: 2, minConfidence: 0.52, maxConfidence: 0.81, maxSize: 130 },
+  planter_skip: { minCount: 0, maxCount: 1, minConfidence: 0.41, maxConfidence: 0.75, maxSize: 180 },
+  standing_water: { minCount: 1, maxCount: 2, minConfidence: 0.55, maxConfidence: 0.89, maxSize: 220 },
+  waterway: { minCount: 0, maxCount: 1, minConfidence: 0.45, maxConfidence: 0.76, maxSize: 300 },
+  weed_cluster: { minCount: 1, maxCount: 3, minConfidence: 0.5, maxConfidence: 0.9, maxSize: 110 },
+  nutrient_deficiency: { minCount: 1, maxCount: 3, minConfidence: 0.58, maxConfidence: 0.91, maxSize: 160 },
+  storm_damage: { minCount: 0, maxCount: 2, minConfidence: 0.6, maxConfidence: 0.93, maxSize: 250 },
+};
 
-function randomBBox(): [number, number, number, number] {
-  const x1 = Math.random() * (IMAGE_SIZE - 80);
-  const y1 = Math.random() * (IMAGE_SIZE - 80);
-  const width = 40 + Math.random() * (IMAGE_SIZE - x1 - 40);
-  const height = 40 + Math.random() * (IMAGE_SIZE - y1 - 40);
+function randRange(min: number, max: number) {
+  return min + Math.random() * (max - min);
+}
 
+function randInt(min: number, max: number) {
+  return Math.floor(randRange(min, max + 1));
+}
+
+function mockBBox(maxDimension: number): [number, number, number, number] {
+  const width = randRange(24, Math.min(maxDimension, IMAGE_SIZE - 24));
+  const height = randRange(24, Math.min(maxDimension, IMAGE_SIZE - 24));
+  const x1 = randRange(0, IMAGE_SIZE - width);
+  const y1 = randRange(0, IMAGE_SIZE - height);
   const x2 = x1 + width;
   const y2 = y1 + height;
 
   return [
     Number(x1.toFixed(1)),
     Number(y1.toFixed(1)),
-    Number(Math.min(x2, IMAGE_SIZE).toFixed(1)),
-    Number(Math.min(y2, IMAGE_SIZE).toFixed(1)),
+    Number(Math.min(x2, IMAGE_SIZE - 0.1).toFixed(1)),
+    Number(Math.min(y2, IMAGE_SIZE - 0.1).toFixed(1)),
   ];
 }
 
@@ -47,23 +74,36 @@ function summarizeDetections(detections: Detection[]) {
 }
 
 function createMockDetections(): Detection[] {
-  return [
-    {
-      class: 'nutrient_deficiency',
-      confidence: 0.87,
-      bbox: randomBBox(),
-    },
-    {
-      class: 'weed_cluster',
-      confidence: 0.73,
-      bbox: randomBBox(),
-    },
-    {
-      class: 'water',
-      confidence: 0.65,
-      bbox: randomBBox(),
-    },
-  ];
+  const detections: Detection[] = [];
+
+  (Object.keys(MOCK_CLASS_WEIGHTS) as Array<keyof typeof MOCK_CLASS_WEIGHTS>).forEach(
+    (className) => {
+      const config = MOCK_CLASS_RANGES[className];
+      const count = randInt(config.minCount, config.maxCount);
+
+      for (let i = 0; i < count; i += 1) {
+        const confidence = randRange(config.minConfidence, config.maxConfidence);
+
+        detections.push({
+          class: className,
+          confidence: Number(confidence.toFixed(4)),
+          bbox: mockBBox(config.maxSize),
+        });
+      }
+    }
+  );
+
+  return detections;
+}
+
+function calculateHealthScore(detections: Detection[]) {
+  const issuePenalty = detections.reduce((acc, detection) => {
+    const weight = MOCK_CLASS_WEIGHTS[detection.class] ?? 8;
+    return acc + detection.confidence * weight;
+  }, 0);
+
+  const score = 100 - issuePenalty;
+  return Number(Math.max(0, Math.min(100, score)).toFixed(2));
 }
 
 function parseDetectionsOutput(stdout: string): Detection[] {
@@ -141,10 +181,28 @@ export async function POST(request: NextRequest) {
         )
       : createMockDetections();
 
+    const healthScore = calculateHealthScore(detections);
+    const resultId = uuidv4();
+    const ext = imageExtension || '.jpg';
+    const resultImageUrl = `analysis-${resultId}${ext}`;
+    const timestamp = new Date().toISOString();
+
+    addAnalysisResult({
+      id: resultId,
+      imageUrl: resultImageUrl,
+      detections,
+      healthScore,
+      timestamp,
+    });
+
     return NextResponse.json({
       success: true,
+      resultId,
       detections,
+      healthScore,
       summary: summarizeDetections(detections),
+      imageUrl: resultImageUrl,
+      timestamp,
     });
   } catch (error) {
     console.error('Failed to analyze image', error);

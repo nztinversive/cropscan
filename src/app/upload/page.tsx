@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Field } from "@/lib/types";
+import { useRouter } from "next/navigation";
 
 export default function UploadPage() {
+  const router = useRouter();
   const [fields, setFields] = useState<Field[]>([]);
   const [selectedField, setSelectedField] = useState("");
   const [droneModel, setDroneModel] = useState("DJI Mavic 3 Multispectral");
@@ -11,6 +13,8 @@ export default function UploadPage() {
   const [notes, setNotes] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     fetch("/api/fields")
@@ -35,6 +39,39 @@ export default function UploadPage() {
       setFiles((prev) => [...prev, ...Array.from(e.target.files!)]);
     }
   }, []);
+
+  const onAnalyze = useCallback(async () => {
+    if (files.length === 0 || isAnalyzing) return;
+
+    setIsAnalyzing(true);
+    setError("");
+
+    try {
+      const formData = new FormData();
+      formData.set("image", files[0]);
+      formData.set("fieldId", selectedField);
+      formData.set("droneModel", droneModel);
+      formData.set("altitude", altitude);
+      formData.set("notes", notes);
+
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data?.success !== true || !data.resultId) {
+        throw new Error(data?.error ?? "Analysis failed. Please try again.");
+      }
+
+      router.push(`/results/${data.resultId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Analysis failed. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [altitude, droneModel, files, isAnalyzing, notes, router, selectedField]);
 
   return (
     <div className="space-y-8">
@@ -149,11 +186,15 @@ export default function UploadPage() {
           </div>
 
           <button
-            disabled={files.length === 0}
+            onClick={onAnalyze}
+            disabled={files.length === 0 || isAnalyzing}
             className="w-full rounded-lg bg-[#22C55E] px-4 py-2.5 text-sm font-medium text-black transition-colors hover:bg-[#16A34A] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Process {files.length} Image{files.length !== 1 ? "s" : ""}
+            {isAnalyzing
+              ? "Analyzing..."
+              : `Process ${files.length} Image${files.length !== 1 ? "s" : ""}`}
           </button>
+          {error && <p className="text-sm text-red-400">{error}</p>}
         </section>
       </div>
 

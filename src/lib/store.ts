@@ -1,4 +1,4 @@
-import { Field, Flight, HealthMap, Alert, DashboardStats } from './types';
+import { Field, Flight, HealthMap, Alert, DashboardStats, AnalysisResult } from './types';
 import { SEED_FIELDS, SEED_FLIGHTS, SEED_HEALTH_MAPS, SEED_ALERTS } from './seed-data';
 
 // In-memory store (resets on server restart, but sufficient for MVP)
@@ -6,6 +6,7 @@ let fields: Field[] = [...SEED_FIELDS];
 let flights: Flight[] = [...SEED_FLIGHTS];
 let healthMaps: HealthMap[] = [...SEED_HEALTH_MAPS];
 let alerts: Alert[] = [...SEED_ALERTS];
+let analysisResults: AnalysisResult[] = [];
 
 export function getFields(): Field[] {
   return fields;
@@ -50,6 +51,19 @@ export function addHealthMap(hm: HealthMap): HealthMap {
   return hm;
 }
 
+export function getAnalysisResults(): AnalysisResult[] {
+  return analysisResults;
+}
+
+export function getAnalysisResult(id: string): AnalysisResult | undefined {
+  return analysisResults.find(result => result.id === id);
+}
+
+export function addAnalysisResult(result: AnalysisResult): AnalysisResult {
+  analysisResults.push(result);
+  return result;
+}
+
 export function getAlerts(fieldId?: string): Alert[] {
   if (fieldId) return alerts.filter(a => a.fieldId === fieldId);
   return alerts;
@@ -73,4 +87,5 @@ export function resetStore(): void {
   flights = [...SEED_FLIGHTS];
   healthMaps = [...SEED_HEALTH_MAPS];
   alerts = [...SEED_ALERTS];
+  analysisResults = [];
 }

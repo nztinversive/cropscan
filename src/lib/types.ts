@@ -82,3 +82,17 @@ export interface DashboardStats {
   criticalFields: number;
   recentAlerts: Alert[];
 }
+
+export interface Detection {
+  class: string;
+  confidence: number;
+  bbox: [number, number, number, number];
+}
+
+export interface AnalysisResult {
+  id: string;
+  imageUrl: string;
+  detections: Detection[];
+  healthScore: number;
+  timestamp: string;
+}
