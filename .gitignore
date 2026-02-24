@@ -34,3 +34,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# YOLO model weights
+model/best.pt
+model/*.pt
+*.pt

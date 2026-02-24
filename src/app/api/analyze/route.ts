@@ -12,30 +12,16 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const IMAGE_SIZE = 512;
-const MOCK_CLASS_WEIGHTS: Record<string, number> = {
-  cloud_shadow: 6,
-  double_plant: 8,
-  planter_skip: 10,
-  standing_water: 14,
-  waterway: 2,
-  weed_cluster: 9,
-  nutrient_deficiency: 12,
-  storm_damage: 16,
-};
 
-const MOCK_CLASS_RANGES: Record<
-  keyof typeof MOCK_CLASS_WEIGHTS,
-  { minCount: number; maxCount: number; minConfidence: number; maxConfidence: number; maxSize: number }
-> = {
-  cloud_shadow: { minCount: 1, maxCount: 2, minConfidence: 0.48, maxConfidence: 0.83, maxSize: 240 },
-  double_plant: { minCount: 0, maxCount: 2, minConfidence: 0.52, maxConfidence: 0.81, maxSize: 130 },
-  planter_skip: { minCount: 0, maxCount: 1, minConfidence: 0.41, maxConfidence: 0.75, maxSize: 180 },
-  standing_water: { minCount: 1, maxCount: 2, minConfidence: 0.55, maxConfidence: 0.89, maxSize: 220 },
-  waterway: { minCount: 0, maxCount: 1, minConfidence: 0.45, maxConfidence: 0.76, maxSize: 300 },
-  weed_cluster: { minCount: 1, maxCount: 3, minConfidence: 0.5, maxConfidence: 0.9, maxSize: 110 },
-  nutrient_deficiency: { minCount: 1, maxCount: 3, minConfidence: 0.58, maxConfidence: 0.91, maxSize: 160 },
-  storm_damage: { minCount: 0, maxCount: 2, minConfidence: 0.6, maxConfidence: 0.93, maxSize: 250 },
-};
+// Disease classes are "unhealthy" — healthy leaf classes don't penalize
+const HEALTHY_CLASSES = new Set([
+  'Apple leaf', 'Bell_pepper leaf', 'Blueberry leaf', 'Cherry leaf',
+  'Peach leaf', 'Potato leaf', 'Raspberry leaf', 'Soyabean leaf',
+  'Strawberry leaf', 'Tomato leaf', 'grape leaf',
+]);
+
+// Weight per disease detection (higher = more severe)
+const DISEASE_WEIGHT = 8;
 
 function randRange(min: number, max: number) {
   return min + Math.random() * (max - min);
@@ -73,33 +59,31 @@ function summarizeDetections(detections: Detection[]) {
   };
 }
 
+const MOCK_CLASSES = [
+  'Tomato leaf late blight', 'Corn Gray leaf spot', 'Apple Scab Leaf',
+  'Potato leaf early blight', 'grape leaf black rot', 'Tomato leaf',
+  'Squash Powdery mildew leaf', 'Tomato leaf bacterial spot',
+];
+
 function createMockDetections(): Detection[] {
   const detections: Detection[] = [];
+  const count = randInt(2, 6);
 
-  (Object.keys(MOCK_CLASS_WEIGHTS) as Array<keyof typeof MOCK_CLASS_WEIGHTS>).forEach(
-    (className) => {
-      const config = MOCK_CLASS_RANGES[className];
-      const count = randInt(config.minCount, config.maxCount);
-
-      for (let i = 0; i < count; i += 1) {
-        const confidence = randRange(config.minConfidence, config.maxConfidence);
-
-        detections.push({
-          class: className,
-          confidence: Number(confidence.toFixed(4)),
-          bbox: mockBBox(config.maxSize),
-        });
-      }
-    }
-  );
+  for (let i = 0; i < count; i += 1) {
+    detections.push({
+      class: MOCK_CLASSES[randInt(0, MOCK_CLASSES.length - 1)],
+      confidence: Number(randRange(0.4, 0.9).toFixed(4)),
+      bbox: mockBBox(180),
+    });
+  }
 
   return detections;
 }
 
 function calculateHealthScore(detections: Detection[]) {
-  const issuePenalty = detections.reduce((acc, detection) => {
-    const weight = MOCK_CLASS_WEIGHTS[detection.class] ?? 8;
-    return acc + detection.confidence * weight;
+  const diseaseDetections = detections.filter(d => !HEALTHY_CLASSES.has(d.class));
+  const issuePenalty = diseaseDetections.reduce((acc, detection) => {
+    return acc + detection.confidence * DISEASE_WEIGHT;
   }, 0);
 
   const score = 100 - issuePenalty;

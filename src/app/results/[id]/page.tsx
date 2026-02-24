@@ -7,17 +7,26 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from "recharts";
 import type { AnalysisResult, Prescription } from "@/lib/types";
 import PrescriptionReport from "@/components/PrescriptionReport";
 
-// Color mapping for the 8 YOLO classes
-const classColors: Record<string, string> = {
-  cloud_shadow: "#64748b",
-  double_plant: "#eab308", 
-  planter_skip: "#f97316",
-  standing_water: "#0ea5e9",
-  waterway: "#06b6d4",
-  weed_cluster: "#22c55e",
-  nutrient_deficiency: "#dc2626",
-  storm_damage: "#7c2d12"
-};
+// Dynamic color palette for detection classes
+const COLOR_PALETTE = [
+  "#dc2626", "#eab308", "#22c55e", "#0ea5e9", "#f97316",
+  "#7c3aed", "#06b6d4", "#64748b", "#ec4899", "#14b8a6",
+  "#f43f5e", "#84cc16", "#8b5cf6", "#fb923c", "#2dd4bf",
+  "#a855f7", "#facc15", "#34d399", "#60a5fa", "#f87171",
+  "#c084fc", "#4ade80", "#38bdf8", "#fbbf24", "#e879f9",
+  "#a3e635", "#818cf8", "#fb7185", "#2563eb",
+];
+
+const classColorCache: Record<string, string> = {};
+let colorIndex = 0;
+
+function getClassColor(className: string): string {
+  if (!classColorCache[className]) {
+    classColorCache[className] = COLOR_PALETTE[colorIndex % COLOR_PALETTE.length];
+    colorIndex++;
+  }
+  return classColorCache[className];
+}
 
 const healthScoreColor = (score: number): string => {
   if (score >= 80) return "text-[#22c55e]";
@@ -120,7 +129,7 @@ export default function ResultsPage() {
   ).map(([className, count]) => ({
     name: className.replace('_', ' ').toUpperCase(),
     value: count,
-    color: classColors[className] || "#94a3b8"
+    color: getClassColor(className)
   }));
 
   return (
@@ -181,7 +190,7 @@ export default function ResultsPage() {
                   const [x1, y1, x2, y2] = detection.bbox;
                   const width = x2 - x1;
                   const height = y2 - y1;
-                  const color = classColors[detection.class] || "#94a3b8";
+                  const color = getClassColor(detection.class);
                   
                   return (
                     <g key={index}>
@@ -256,7 +265,7 @@ export default function ResultsPage() {
                     <div className="flex items-center gap-3">
                       <div 
                         className="w-4 h-4 rounded"
-                        style={{ backgroundColor: classColors[detection.class] || "#94a3b8" }}
+                        style={{ backgroundColor: getClassColor(detection.class) }}
                       ></div>
                       <span className="font-medium">{detection.class.replace('_', ' ').toUpperCase()}</span>
                     </div>
