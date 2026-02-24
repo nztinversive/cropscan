@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
 
     const detections = hasModel
       ? parseDetectionsOutput(
-          execSync(`py scripts/infer.py "${tempFilePath}"`, {
+          execSync(`${process.platform === 'win32' ? 'py' : 'python3'} scripts/infer.py "${tempFilePath}"`, {
             encoding: 'utf8',
             env: process.env,
           })
