@@ -96,3 +96,40 @@ export interface AnalysisResult {
   healthScore: number;
   timestamp: string;
 }
+
+// Prescription Pipeline Types
+export interface PrescriptionIssue {
+  class: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  affectedAcres: number;
+  description: string;
+  detectionCount: number;
+  avgConfidence: number;
+}
+
+export interface PrescriptionAction {
+  action: string;
+  product: string;
+  rate: string;
+  timing: string;
+  estimatedCostPerAcre: number;
+  priority: number;
+  zone: string;
+}
+
+export interface YieldImpact {
+  riskLevel: 'low' | 'moderate' | 'high' | 'severe';
+  estimatedLossPerAcre: number;
+  preventionWindow: string;
+  totalEstimatedLoss: number;
+}
+
+export interface Prescription {
+  summary: string;
+  overallHealthGrade: 'A' | 'B' | 'C' | 'D' | 'F';
+  issues: PrescriptionIssue[];
+  prescriptions: PrescriptionAction[];
+  yieldImpact: YieldImpact;
+  totalEstimatedCost: number;
+  generatedAt: string;
+}

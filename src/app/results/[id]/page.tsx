@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from "recharts";
-import type { AnalysisResult } from "@/lib/types";
+import type { AnalysisResult, Prescription } from "@/lib/types";
+import PrescriptionReport from "@/components/PrescriptionReport";
 
 // Color mapping for the 8 YOLO classes
 const classColors: Record<string, string> = {
@@ -29,6 +30,35 @@ export default function ResultsPage() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [prescription, setPrescription] = useState<Prescription | null>(null);
+  const [prescriptionLoading, setPrescriptionLoading] = useState(false);
+  const [prescriptionError, setPrescriptionError] = useState<string | null>(null);
+
+  const generatePrescription = async () => {
+    if (!result) return;
+    setPrescriptionLoading(true);
+    setPrescriptionError(null);
+    try {
+      const res = await fetch('/api/prescribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          detections: result.detections,
+          fieldInfo: { acres: 160 },
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to generate prescription');
+      }
+      const data = await res.json();
+      setPrescription(data);
+    } catch (err) {
+      setPrescriptionError(err instanceof Error ? err.message : 'Prescription failed');
+    } finally {
+      setPrescriptionLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchResult = async () => {
@@ -241,6 +271,43 @@ export default function ResultsPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Prescription Section */}
+        <div className="mt-8">
+          {!prescription ? (
+            <div className="bg-[var(--cs-surface)] border border-[var(--cs-border)] rounded-lg p-6 text-center">
+              <h3 className="text-xl font-semibold mb-3">AI Prescription Report</h3>
+              <p className="text-[var(--cs-muted)] mb-4">
+                Get actionable treatment recommendations, product suggestions, and cost estimates powered by GPT-5 Vision.
+              </p>
+              <button
+                onClick={generatePrescription}
+                disabled={prescriptionLoading || result.detections.length === 0}
+                className="bg-[var(--cs-green)] text-black px-6 py-3 rounded-lg font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {prescriptionLoading ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    Analyzing with GPT-5 Vision...
+                  </span>
+                ) : (
+                  '🧪 Generate Prescription'
+                )}
+              </button>
+              {prescriptionError && (
+                <p className="text-red-400 mt-3">{prescriptionError}</p>
+              )}
+              {result.detections.length === 0 && (
+                <p className="text-[var(--cs-muted)] mt-2 text-sm">No detections to prescribe for.</p>
+              )}
+            </div>
+          ) : (
+            <PrescriptionReport prescription={prescription} />
+          )}
         </div>
       </div>
     </div>
