@@ -39,7 +39,15 @@ class Predictor(BasePredictor):
         return_json: bool = Input(description="Return detection results as JSON", default=True),
     ) -> Output:
         """Run crop disease detection on an image."""
-        result = self.model(str(image), conf=conf, iou=iou, imgsz=imgsz)[0]
+        import shutil
+        # Ensure image has proper extension (Cog downloads without one)
+        img_path = str(image)
+        if not any(img_path.lower().endswith(ext) for ext in ('.jpg', '.jpeg', '.png', '.bmp', '.webp', '.tif', '.tiff')):
+            new_path = img_path + ".jpg"
+            shutil.copy2(img_path, new_path)
+            img_path = new_path
+
+        result = self.model(img_path, conf=conf, iou=iou, imgsz=imgsz)[0]
         image_path = "output.png"
         result.save(image_path)
 
