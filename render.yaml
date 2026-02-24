@@ -4,11 +4,13 @@ services:
     runtime: node
     repo: https://github.com/nztinversive/cropscan
     branch: main
-    buildCommand: apt-get update && apt-get install -y python3 python3-pip && pip3 install ultralytics==8.4.14 --break-system-packages && chmod +x scripts/download-model.sh && ./scripts/download-model.sh && npm ci && npm run build
+    buildCommand: npm ci && npm run build
     startCommand: npm start
     plan: free
     envVars:
       - key: NODE_ENV
         value: production
       - key: NEXT_PUBLIC_MAPBOX_TOKEN
+        sync: false
+      - key: REPLICATE_API_TOKEN
         sync: false

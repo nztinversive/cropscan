@@ -1,12 +1,13 @@
 import { execSync } from 'child_process';
 import { existsSync } from 'fs';
-import { writeFile, unlink } from 'fs/promises';
+import { writeFile, unlink, readFile } from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { NextRequest, NextResponse } from 'next/server';
 import { addAnalysisResult } from '@/lib/store';
 import { Detection } from '@/lib/types';
+import Replicate from 'replicate';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -153,17 +154,45 @@ export async function POST(request: NextRequest) {
     const imageBuffer = Buffer.from(await image.arrayBuffer());
     await writeFile(tempFilePath, imageBuffer);
 
-    const modelPath = process.env.MODEL_PATH ?? './model/best.pt';
-    const hasModel = existsSync(path.resolve(modelPath));
+    let detections: Detection[];
 
-    const detections = hasModel
-      ? parseDetectionsOutput(
-          execSync(`${process.platform === 'win32' ? 'py' : 'python3'} scripts/infer.py "${tempFilePath}"`, {
-            encoding: 'utf8',
-            env: process.env,
-          })
-        )
-      : createMockDetections();
+    const replicateToken = process.env.REPLICATE_API_TOKEN;
+    const modelPath = process.env.MODEL_PATH ?? './model/best.pt';
+    const hasLocalModel = existsSync(path.resolve(modelPath));
+
+    if (replicateToken) {
+      // Replicate inference (production on Render)
+      try {
+        const replicate = new Replicate({ auth: replicateToken });
+        const imageData = await readFile(tempFilePath);
+        const base64 = `data:image/jpeg;base64,${imageData.toString('base64')}`;
+
+        const output = await replicate.run(
+          'nztinversive/cropscan-yolo11' as `${string}/${string}`,
+          { input: { image: base64, conf: 0.25, imgsz: 640, return_json: true } }
+        ) as { json_str?: string };
+
+        const parsed = JSON.parse(output.json_str ?? '{"detections":[]}');
+        detections = (parsed.detections ?? []).map((d: { class: string; confidence: number; bbox: number[] }) => ({
+          class: d.class,
+          confidence: Number(d.confidence.toFixed(4)),
+          bbox: d.bbox.map((v: number) => Number(v.toFixed(1))) as [number, number, number, number],
+        }));
+      } catch (err) {
+        console.error('Replicate inference failed, falling back:', err);
+        detections = createMockDetections();
+      }
+    } else if (hasLocalModel) {
+      // Local Python inference (development)
+      detections = parseDetectionsOutput(
+        execSync(`${process.platform === 'win32' ? 'py' : 'python3'} scripts/infer.py "${tempFilePath}"`, {
+          encoding: 'utf8',
+          env: process.env,
+        })
+      );
+    } else {
+      detections = createMockDetections();
+    }
 
     const healthScore = calculateHealthScore(detections);
     const resultId = uuidv4();
