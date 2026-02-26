@@ -14,12 +14,8 @@ export const runtime = 'nodejs';
 
 const IMAGE_SIZE = 512;
 
-// Disease classes are "unhealthy" — healthy leaf classes don't penalize
-const HEALTHY_CLASSES = new Set([
-  'Apple leaf', 'Bell_pepper leaf', 'Blueberry leaf', 'Cherry leaf',
-  'Peach leaf', 'Potato leaf', 'Raspberry leaf', 'Soyabean leaf',
-  'Strawberry leaf', 'Tomato leaf', 'grape leaf',
-]);
+// CropScan v3 classes: healthy, bacterial, fungal, viral, nutrient_stress, other_disease
+const HEALTHY_CLASSES = new Set(['healthy']);
 
 // Weight per disease detection (higher = more severe)
 const DISEASE_WEIGHT = 8;
@@ -61,9 +57,7 @@ function summarizeDetections(detections: Detection[]) {
 }
 
 const MOCK_CLASSES = [
-  'Tomato leaf late blight', 'Corn Gray leaf spot', 'Apple Scab Leaf',
-  'Potato leaf early blight', 'grape leaf black rot', 'Tomato leaf',
-  'Squash Powdery mildew leaf', 'Tomato leaf bacterial spot',
+  'healthy', 'bacterial', 'fungal', 'viral', 'nutrient_stress', 'other_disease',
 ];
 
 function createMockDetections(): Detection[] {
@@ -168,7 +162,7 @@ export async function POST(request: NextRequest) {
         const base64 = `data:image/jpeg;base64,${imageData.toString('base64')}`;
 
         const output = await replicate.run(
-          'nztinversive/cropscan-yolo11' as `${string}/${string}`,
+          'nztinversive/cropscan-v3' as `${string}/${string}`,
           { input: { image: base64, conf: 0.25, imgsz: 640, return_json: true } }
         ) as { json_str?: string };
 
